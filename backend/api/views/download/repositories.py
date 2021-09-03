@@ -3,7 +3,7 @@ import itertools
 from collections import defaultdict
 from typing import Dict, Iterator, List
 
-from ...models import Example, Project
+from ...models import AnnotationRelations, Span, Example, Project
 from .data import Record
 
 
@@ -84,15 +84,19 @@ class TextRepository(BaseRepository):
 
         for doc in docs:
             label_per_user = self.label_per_user(doc)
+            annotation_relations_per_user = self.annotation_relations_per_user()
             if self.project.collaborative_annotation:
                 label_per_user = self.reduce_user(label_per_user)
+                annotation_relations_per_user = self.reduce_user(annotation_relations_per_user)
+
             for user, label in label_per_user.items():
                 yield Record(
                     id=doc.id,
                     data=doc.text,
                     label=label,
                     user=user,
-                    metadata=doc.meta
+                    metadata=doc.meta,
+                    annotation_relations=annotation_relations_per_user[user]
                 )
             # todo:
             # If there is no label, export the doc with `unknown` user.
@@ -146,7 +150,22 @@ class SequenceLabelingRepository(TextRepository):
         for a in doc.spans.all():
             label = (a.start_offset, a.end_offset, a.label.text)
             label_per_user[a.user.username].append(label)
+
         return label_per_user
+
+    def annotation_relations_per_user(self) -> Dict:
+        annotation_relations_per_user = defaultdict(list)
+        for a in AnnotationRelations.objects.all():
+            span_1 = Span.objects.get(id=a.annotation_id_1)
+            span_2 = Span.objects.get(id=a.annotation_id_2)
+            annotation_relation = (
+                span_1.start_offset,
+                span_1.label.text,
+                span_2.start_offset,
+                span_2.label.text,
+                a.type.name)
+            annotation_relations_per_user[a.user.username].append(annotation_relation)
+        return annotation_relations_per_user
 
 
 class Seq2seqRepository(TextRepository):

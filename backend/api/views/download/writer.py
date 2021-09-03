@@ -135,7 +135,8 @@ class JSONLWriter(LineWriter):
             'id': record.id,
             'data': record.data,
             'label': record.label,
-            **record.metadata
+            'relations': record.annotation_relations,
+            ** record.metadata
         }, ensure_ascii=False)
 
 
